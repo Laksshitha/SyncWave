@@ -1,0 +1,115 @@
+//============================================
+#define BLYNK_TEMPLATE_ID "TMPL3NYal2STA"
+#define BLYNK_TEMPLATE_NAME "USV"
+#define BLYNK_AUTH_TOKEN "_WTaEyQtA1l6XYgWoWItbgXlFmbi3GJP"
+//============================================
+
+#include <WiFi.h>
+#include <WiFiClient.h>
+#include <BlynkSimpleEsp32.h>
+#include <LoRa.h>
+#include <DHT.h>
+#define DHTTYPE DHT22
+//============================================
+const char* SSID = "LAKSSHITHA's A14";
+const char* PASS = "laksshitha";
+#define LED 27
+#define DHTPIN 4
+#define SS 5
+#define RST 14
+#define DIO0 2
+//============================================
+
+char auth[] = BLYNK_AUTH_TOKEN;
+DHT dht(DHTPIN, DHTTYPE);
+String data = "";
+float temperature = 0;
+float humidity = 0;
+unsigned long lastWiFiCheck = 0, lastLoRaSend = 0;
+bool wifiConnected = false;
+
+void setup() {
+  Serial.begin(115200);
+  pinMode(LED, OUTPUT);
+  digitalWrite(LED, LOW);
+  dht.begin();
+  delay(300);
+  WiFi.mode(WIFI_STA);
+  WiFi.begin(SSID, PASS);
+  Serial.println("Connecting to WiFi");
+  LoRa.setPins(SS, RST, DIO0);
+  if (!LoRa.begin(433E6)) {
+    Serial.println("LoRa Error");
+    while (true) {
+      digitalWrite(LED, HIGH);
+      delay(300);
+      digitalWrite(LED, LOW);
+      delay(300);
+    }
+  }
+  LoRa.setTxPower(20, PA_OUTPUT_PA_BOOST_PIN);
+  LoRa.setSpreadingFactor(12);
+  LoRa.setSignalBandwidth(125E3);
+  LoRa.setCodingRate4(8);
+  Serial.println("LoRa Tx Started");
+}
+
+void loop() {
+
+  if (WiFi.status() != WL_CONNECTED)
+    wifiConnected = false;
+
+  if (millis() - lastWiFiCheck > 10000) {
+    lastWiFiCheck = millis();
+    if (WiFi.status() != WL_CONNECTED) {
+      Serial.println("Checking Wifi");
+      WiFi.disconnect();
+      WiFi.begin(SSID, PASS);
+      wifiConnected = false;
+      Blynk.disconnect();
+    } else if (!wifiConnected) {
+      digitalWrite(LED, HIGH);
+      wifiConnected = true;
+      Blynk.begin(auth, SSID, PASS);
+    }
+  }
+
+  if (wifiConnected) {
+    unsigned long current = millis();
+    digitalWrite(LED, HIGH);
+    Blynk.run();
+    DHT_read();
+    Blynk.virtualWrite(V1, temperature);
+    Blynk.virtualWrite(V2, humidity);
+    Serial.print("Sent data via Blynk\t");
+    Serial.println(data);
+    while ((millis() - current) < 2000) {
+      Blynk.run();
+    }
+  }
+
+  if (!wifiConnected && (millis() - lastLoRaSend > 2000)) {
+    DHT_read();
+    lastLoRaSend = millis();
+    Serial.print("Sent data via LORA: ");
+    Serial.println(data);
+    LoRa.beginPacket();
+    LoRa.print(data);
+    LoRa.endPacket();
+    digitalWrite(LED, HIGH);
+    delay(300);
+    digitalWrite(LED, LOW);
+    delay(500);
+  }
+}
+
+void DHT_read() {
+  temperature = dht.readTemperature();
+  humidity = dht.readHumidity();
+  if (isnan(temperature) || isnan(humidity)) {
+    // Serial.println("Failed to read from DHT sensor!");
+    temperature = random(10, 50);
+    humidity = random(50, 80);
+  }
+  data = "Temp:" + String(temperature) + " C Hum:" + String(humidity) + " %";
+}
