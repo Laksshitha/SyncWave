@@ -1,1 +1,2 @@
-# SyncWave
+# SyncWave - Reliable network switching in USV
+Developed a smart network-switching system for Unmanned Surface Vehicles (USVs) using ESP32, LoRa, Wi-Fi, and Arduino IDE. The system dynamically monitors signal strength and automatically switches to the most reliable network based on the USV's real-time location. Designed to ensure seamless communication without data loss during transitions between networks, enhancing mission reliability and range in remote or changing environments.
